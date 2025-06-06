@@ -333,7 +333,7 @@ const ChatBox = ({ isVisible, onClose, currentQuestion }) => {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             placeholder="질문을 입력하세요..."
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={isLoading}
