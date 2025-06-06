@@ -3,27 +3,11 @@ import { BookOpen, BrainCircuit, Sigma, Puzzle, Wand2, LoaderCircle } from 'luci
 
 // --- Helper for OpenAI ChatGPT API Calls ---
 const callOpenAIAPI = async (prompt, isJson = false) => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    const apiUrl = 'https://api.openai.com/v1/chat/completions';
-
-    const payload = {
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-    };
-
-    if (isJson) {
-        payload.response_format = { type: 'json_object' };
-    }
-
     try {
-        const response = await fetch(apiUrl, {
+        const response = await fetch('/api/chat', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, isJson }),
         });
 
         if (!response.ok) {
@@ -33,7 +17,7 @@ const callOpenAIAPI = async (prompt, isJson = false) => {
         }
 
         const result = await response.json();
-        const text = result.choices?.[0]?.message?.content?.trim();
+        const text = result.text?.trim();
         if (!text) {
             throw new Error('No content received from API.');
         }

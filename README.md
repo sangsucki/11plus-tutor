@@ -20,3 +20,14 @@ VITE_OPENAI_API_KEY=your-api-key
 ```
 
 The `.env` file is ignored by Git so your API key remains private. See `.env.example` for the expected variable name.
+
+## Running the development server
+
+Two processes are required: one for the Vite dev server and one for the API proxy.
+
+```bash
+npm run server    # starts the proxy on http://localhost:3001
+npm run dev       # starts the Vite dev server
+```
+
+The front-end proxies `/api` requests to the Node server which communicates with OpenAI, avoiding browser CORS issues.
