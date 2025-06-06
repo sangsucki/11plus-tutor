@@ -1,64 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, BrainCircuit, Sigma, Puzzle, Wand2, LoaderCircle } from 'lucide-react';
 
-// --- Helper for Gemini API Calls ---
-const callGeminiAPI = async (prompt, isJson = false) => {
-    // IMPORTANT: In a real application, you should handle the API key securely.
-    // This key is a placeholder and will be managed by the execution environment.
-    const apiKey = ""; 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+// --- Helper for OpenAI ChatGPT API Calls ---
+const callOpenAIAPI = async (prompt, isJson = false) => {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const apiUrl = 'https://api.openai.com/v1/chat/completions';
 
     const payload = {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {}
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
     };
 
     if (isJson) {
-        payload.generationConfig = {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: "OBJECT",
-                properties: {
-                    type: { type: "STRING" },
-                    passage: { type: "STRING" },
-                    question: { type: "STRING" },
-                    answer: { type: "STRING" },
-                },
-                required: ["type", "question", "answer"]
-            },
-        };
+        payload.response_format = { type: 'json_object' };
     }
 
     try {
         const response = await fetch(apiUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
             const errorBody = await response.text();
-            console.error("API Error Response:", errorBody);
+            console.error('API Error Response:', errorBody);
             throw new Error(`API call failed with status: ${response.status}`);
         }
 
         const result = await response.json();
-
-        if (result.candidates && result.candidates.length > 0 &&
-            result.candidates[0].content && result.candidates[0].content.parts &&
-            result.candidates[0].content.parts.length > 0) {
-            const text = result.candidates[0].content.parts[0].text;
-            return isJson ? JSON.parse(text) : text;
-        } else {
-            console.error("Unexpected API response structure:", result);
-            if (result.promptFeedback && result.promptFeedback.blockReason) {
-                 throw new Error(`Request blocked: ${result.promptFeedback.blockReason}. Details: ${result.promptFeedback.blockReasonMessage || 'No details'}`);
-            }
-            throw new Error("No content received from API.");
+        const text = result.choices?.[0]?.message?.content?.trim();
+        if (!text) {
+            throw new Error('No content received from API.');
         }
+        return isJson ? JSON.parse(text) : text;
     } catch (error) {
-        console.error("Error calling Gemini API:", error);
-        throw error; // Re-throw the error to be caught by the caller
+        console.error('Error calling OpenAI API:', error);
+        throw error;
     }
 };
 
@@ -137,7 +119,7 @@ const QuestionCard = ({ questionData, domain }) => {
         setError(null);
         try {
             const prompt = `You are a helpful 11+ tutor. Provide a single, simple hint for the following ${domain} question, but do not give away the answer. The hint should be a clue to guide an 11-year-old student. Keep it to one sentence in Korean.\n\nQuestion: "${questionData.question}"`;
-            const generatedHint = await callGeminiAPI(prompt);
+            const generatedHint = await callOpenAIAPI(prompt);
             setHint(generatedHint);
         } catch (err) {
             setError('힌트를 가져오는 데 실패했습니다. 다시 시도해주세요.');
@@ -224,7 +206,7 @@ const ChatBox = ({ isVisible, onClose, currentQuestion }) => {
                 prompt += `\n\nAnswer the student's following query concisely: "${userMessage}"`;
             }
             
-            const answer = await callGeminiAPI(prompt);
+            const answer = await callOpenAIAPI(prompt);
             setMessages(prev => [...prev, { from: 'ai', text: answer }]);
         } catch (error) {
             setMessages(prev => [...prev, { from: 'ai', text: "죄송해요, 답변을 가져오는 데 문제가 생겼어요. 잠시 후 다시 시도해주세요." }]);
@@ -235,7 +217,7 @@ const ChatBox = ({ isVisible, onClose, currentQuestion }) => {
 
     return (
         <div className={`fixed top-0 right-0 h-full w-full md:w-96 bg-gray-800 bg-opacity-80 backdrop-blur-sm transition-transform duration-500 ease-in-out z-50 ${isVisible ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="flex flex-col h-full bg-white/95 shadow-2xl rounded-l-2xl">
+            <div className="flex flex-col h-full bg-white/80 shadow-2xl rounded-l-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-gray-200">
                     <h3 className="text-xl font-bold text-gray-800">AI 튜터</h3>
                     <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-full transition-colors">
@@ -311,7 +293,7 @@ export default function App() {
             {"type": "Generated ${domain} Question", "passage": "...", "question": "...", "answer": "..."}
             Ensure the 'passage' key is included, but its value can be an empty string if not needed.`;
             
-            const newQuestion = await callGeminiAPI(prompt, true);
+            const newQuestion = await callOpenAIAPI(prompt, true);
             setCurrentQuestion(newQuestion);
 
         } catch (error) {
@@ -327,7 +309,7 @@ export default function App() {
                 <div className="container mx-auto flex justify-between items-center">
                     <div className='flex items-center gap-2'>
                        <Wand2 className="w-8 h-8 text-indigo-600"/>
-                       <h1 className="text-2xl font-bold text-gray-800">11+ Gemini 튜터</h1>
+                       <h1 className="text-2xl font-bold text-gray-800">11+ ChatGPT 튜터</h1>
                     </div>
                     <button onClick={() => setIsChatVisible(true)} className="fixed bottom-5 right-5 z-50 p-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition transform hover:scale-110">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
