@@ -28,6 +28,8 @@ Two processes are required: one for the Vite dev server and one for the API prox
 ```bash
 npm run server    # starts the proxy on http://localhost:3001
 npm run dev       # starts the Vite dev server
+# or run both together
+npm start
 ```
 
 The front-end proxies `/api` requests to the Node server which communicates with OpenAI, avoiding browser CORS issues.
