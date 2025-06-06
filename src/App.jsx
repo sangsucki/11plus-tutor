@@ -44,6 +44,32 @@ const callOpenAIAPI = async (prompt, isJson = false) => {
     }
 };
 
+// Extract multiple choice options if present
+const parseOptions = (text) => {
+    const optionRegex = /\(([A-D])\)\s*([^()\n]+)/g;
+    const options = [];
+    let match;
+    let firstIndex = null;
+    while ((match = optionRegex.exec(text)) !== null) {
+        if (firstIndex === null) firstIndex = match.index;
+        options.push({ label: match[1], text: match[2].trim() });
+    }
+    if (options.length >= 2) {
+        return { question: text.slice(0, firstIndex).trim(), options };
+    }
+    return { question: text, options: null };
+};
+
+// Evaluate the user's answer using OpenAI
+const evaluateAnswer = async (question, correctAnswer, userAnswer) => {
+    const prompt = `You are grading an 11+ practice question.\nQuestion: "${question}"\nCorrect answer: "${correctAnswer}"\nStudent answer: "${userAnswer}"\nRespond in Korean as JSON {"isCorrect":true|false,"feedback":"short feedback"}`;
+    try {
+        return await callOpenAIAPI(prompt, true);
+    } catch {
+        return { isCorrect: false, feedback: '채점에 실패했습니다.' };
+    }
+};
+
 
 // --- Mock Data: This is now a fallback or initial state ---
 const QUESTIONS_DATA = {
@@ -105,11 +131,16 @@ const QuestionCard = ({ questionData, domain }) => {
     const [hint, setHint] = useState(null);
     const [isHintLoading, setIsHintLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [userAnswer, setUserAnswer] = useState('');
+    const [evaluation, setEvaluation] = useState(null);
+    const [isChecking, setIsChecking] = useState(false);
 
     useEffect(() => {
         setShowAnswer(false);
         setHint(null);
         setError(null);
+        setUserAnswer('');
+        setEvaluation(null);
     }, [questionData]);
 
     const handleGetHint = async () => {
@@ -139,12 +170,63 @@ const QuestionCard = ({ questionData, domain }) => {
     }
     
     const { type, passage, question, answer } = questionData;
+    const { question: cleanQuestion, options } = parseOptions(question);
+
+    const handleCheckAnswer = async () => {
+        if (!userAnswer.trim()) return;
+        setIsChecking(true);
+        try {
+            const result = await evaluateAnswer(question, answer, userAnswer);
+            setEvaluation(result);
+        } catch (err) {
+            setEvaluation({ isCorrect: false, feedback: '채점에 실패했습니다.' });
+        } finally {
+            setIsChecking(false);
+        }
+    };
 
     return (
         <div className="bg-white p-8 rounded-2xl shadow-lg w-full transition-all duration-500 animate-fade-in">
             <h3 className="text-sm font-semibold text-indigo-600 uppercase tracking-wider">{type || domain}</h3>
             {passage && passage.length > 10 && <p className="mt-4 text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200 whitespace-pre-wrap">{passage}</p>}
-            <p className="mt-6 text-xl font-medium text-gray-800">{question}</p>
+            <p className="mt-6 text-xl font-medium text-gray-800">{cleanQuestion}</p>
+
+            {options ? (
+                <div className="mt-4 flex flex-col gap-2">
+                    {options.map((opt) => (
+                        <label key={opt.label} className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="mcq"
+                                value={opt.label}
+                                checked={userAnswer === opt.label}
+                                onChange={(e) => setUserAnswer(e.target.value)}
+                            />
+                            <span>{opt.label}. {opt.text}</span>
+                        </label>
+                    ))}
+                </div>
+            ) : (
+                <input
+                    type="text"
+                    className="mt-4 w-full p-2 border rounded"
+                    placeholder="답을 입력하세요"
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                />
+            )}
+
+            <button
+                onClick={handleCheckAnswer}
+                disabled={isChecking || !userAnswer.trim()}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300"
+            >
+                {isChecking ? '채점중...' : '답안 제출'}
+            </button>
+
+            {evaluation && (
+                <p className={`mt-4 font-semibold ${evaluation.isCorrect ? 'text-green-600' : 'text-red-600'}`}>{evaluation.feedback}</p>
+            )}
             
             <div className="mt-8 flex flex-wrap gap-4 items-center">
                 <button onClick={() => setShowAnswer(!showAnswer)} className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
